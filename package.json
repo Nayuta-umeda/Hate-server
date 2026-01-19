@@ -1,0 +1,15 @@
+{
+  "name": "mikoku-lobby",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "2ch風ロビー + 密告掲示板 (server + html separated)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "helmet": "^7.1.0"
+  }
+}
