@@ -14,7 +14,7 @@ const API = "/api/diary";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
 const ADMIN_TOKEN_SECRET = process.env.ADMIN_TOKEN_SECRET || "change-me";
 
-const DB_PATH = path.join(process.cwd(), "data", "db.json");
+const DB_PATH = path.join(process.cwd(), "db.json");
 
 function uid(prefix) { return prefix + crypto.randomBytes(10).toString("hex"); }
 function nowISO() { return new Date().toISOString(); }
