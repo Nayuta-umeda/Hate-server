@@ -1,5 +1,47 @@
 {
-  "threads": [],
+  "threads": [
+    {
+      "id": "T0e9ca18c94b5ead4b69b",
+      "title": "テスト日記",
+      "tags": [
+        "晴れ"
+      ],
+      "creatorId": "u1",
+      "createdAt": "2026-01-20T22:41:57.917Z",
+      "updatedAt": "2026-01-20T22:41:57.917Z",
+      "hidden": false,
+      "likesByUser": {},
+      "posts": [
+        {
+          "id": "Pd7ee6222812a3caecabf",
+          "authorId": "u1",
+          "createdAt": "2026-01-20T22:41:57.917Z",
+          "updatedAt": "2026-01-20T22:41:57.917Z",
+          "body": "今日はいい日"
+        }
+      ],
+      "pv": {
+        "total": 1,
+        "day": {
+          "2026-01-21": 1
+        },
+        "week": {
+          "2026-01-19": 1
+        },
+        "month": {
+          "2026-01": 1
+        },
+        "byUser": {
+          "u2": {
+            "day": "2026-01-21",
+            "week": "2026-01-19",
+            "month": "2026-01",
+            "ts": "2026-01-20T22:42:13.844Z"
+          }
+        }
+      }
+    }
+  ],
   "attachments": [],
   "verifyRequests": [],
   "verifiedUsers": {}

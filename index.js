@@ -214,9 +214,12 @@ function threadSummary(t){
   const likeWeek = likeCount(t, 7*24*60*60*1000);
   const likeMonth = likeCount(t, 30*24*60*60*1000);
   const { pvDay, pvWeek, pvMonth, pvTotal } = pvCounts(t);
+  const firstBody = (t.posts && t.posts[0] && t.posts[0].body) ? String(t.posts[0].body) : "";
+  const body = sanitizeText(firstBody, 320);
   return {
     id: t.id,
     title: t.title,
+    body,
     tags: t.tags || [],
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
