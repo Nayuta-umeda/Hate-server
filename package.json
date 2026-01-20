@@ -1,15 +1,13 @@
 {
-  "name": "mikoku-lobby",
-  "private": true,
-  "type": "module",
+  "name": "ijime-mikokusho-server",
   "version": "1.0.0",
-  "description": "2ch風ロビー + 密告掲示板 (server + html separated)",
-  "main": "server.js",
+  "type": "module",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "helmet": "^7.1.0"
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
   }
 }
