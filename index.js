@@ -78,6 +78,109 @@ function likeCount(thread, ms) {
   return c;
 }
 
+function jstDate(nowMs){ return new Date((nowMs ?? Date.now()) + 9*60*60*1000); }
+function jstDayKey(nowMs){ return jstDate(nowMs).toISOString().slice(0,10); }
+function jstMonthKey(nowMs){ return jstDate(nowMs).toISOString().slice(0,7); }
+function jstWeekKey(nowMs){
+  const d = jstDate(nowMs);
+  const dow = d.getUTCDay(); // 0=Sun..6=Sat in "JST as UTC"
+  const diff = (dow + 6) % 7; // days since Monday
+  const mon = new Date(d.getTime() - diff*24*60*60*1000);
+  return mon.toISOString().slice(0,10);
+}
+function ensurePV(thread){
+  thread.pv ||= { total: 0, day: {}, week: {}, month: {}, byUser: {} };
+  thread.pv.day ||= {};
+  thread.pv.week ||= {};
+  thread.pv.month ||= {};
+  thread.pv.byUser ||= {};
+  return thread.pv;
+}
+function prunePV(thread){
+  const pv = ensurePV(thread);
+  const cutoff = Date.now() - 62*24*60*60*1000;
+  // prune byUser
+  const out = {};
+  for (const [uid, rec] of Object.entries(pv.byUser || {})){
+    const t = Date.parse(rec?.ts || "");
+    if (Number.isFinite(t) && t >= cutoff) out[uid] = rec;
+  }
+  pv.byUser = out;
+  // prune day/week buckets (keys are YYYY-MM-DD in JST-as-UTC)
+  const pruneBucket = (bucket)=>{
+    const outB = {};
+    for (const [k, v] of Object.entries(bucket || {})){
+      const t = Date.parse(k + "T00:00:00Z");
+      if (Number.isFinite(t) && t >= cutoff) outB[k] = v;
+    }
+    return outB;
+  };
+  pv.day = pruneBucket(pv.day);
+  pv.week = pruneBucket(pv.week);
+  // month: keep modest; prune > 18 months
+  const monthOut = {};
+  const now = jstDate().toISOString().slice(0,7); // YYYY-MM
+  const [ny, nm] = now.split("-").map(Number);
+  for (const [k, v] of Object.entries(pv.month || {})){
+    const [y, m] = String(k).split("-").map(Number);
+    if (!Number.isFinite(y) || !Number.isFinite(m)) continue;
+    const monthsAgo = (ny - y)*12 + (nm - m);
+    if (monthsAgo <= 18) monthOut[k] = v;
+  }
+  pv.month = monthOut;
+}
+function recordPV(thread, viewerId){
+  if (!viewerId) return;
+  // Don't count creator's own views (prevents easy inflation)
+  const creator = String(thread.creatorId || thread.authorId || "");
+  if (creator && String(viewerId) === creator) return;
+
+  prunePV(thread);
+  const pv = ensurePV(thread);
+  const now = Date.now();
+  const dayKey = jstDayKey(now);
+  const weekKey = jstWeekKey(now);
+  const monthKey = jstMonthKey(now);
+
+  const rec = pv.byUser[viewerId] || { day:"", week:"", month:"", ts: "" };
+  let bumped = false;
+
+  if (rec.day !== dayKey){
+    pv.day[dayKey] = (pv.day[dayKey] || 0) + 1;
+    pv.total = (pv.total || 0) + 1;
+    rec.day = dayKey;
+    bumped = true;
+  }
+  if (rec.week !== weekKey){
+    pv.week[weekKey] = (pv.week[weekKey] || 0) + 1;
+    rec.week = weekKey;
+    bumped = true;
+  }
+  if (rec.month !== monthKey){
+    pv.month[monthKey] = (pv.month[monthKey] || 0) + 1;
+    rec.month = monthKey;
+    bumped = true;
+  }
+  if (bumped){
+    rec.ts = nowISO();
+    pv.byUser[viewerId] = rec;
+  }
+}
+function pvCounts(thread){
+  prunePV(thread);
+  const pv = ensurePV(thread);
+  const now = Date.now();
+  const dayKey = jstDayKey(now);
+  const weekKey = jstWeekKey(now);
+  const monthKey = jstMonthKey(now);
+  return {
+    pvDay: pv.day?.[dayKey] || 0,
+    pvWeek: pv.week?.[weekKey] || 0,
+    pvMonth: pv.month?.[monthKey] || 0,
+    pvTotal: pv.total || 0,
+  };
+}
+
 function signAdminToken() {
   const ts = Date.now().toString();
   const payload = `admin:${ts}`;
@@ -110,6 +213,7 @@ function threadSummary(t){
   const likeDay = likeCount(t, 24*60*60*1000);
   const likeWeek = likeCount(t, 7*24*60*60*1000);
   const likeMonth = likeCount(t, 30*24*60*60*1000);
+  const { pvDay, pvWeek, pvMonth, pvTotal } = pvCounts(t);
   return {
     id: t.id,
     title: t.title,
@@ -118,6 +222,7 @@ function threadSummary(t){
     updatedAt: t.updatedAt,
     postCount: (t.posts || []).length,
     likeDay, likeWeek, likeMonth,
+    pvDay, pvWeek, pvMonth, pvTotal,
   };
 }
 
@@ -136,9 +241,12 @@ app.get(`${API}/threads`, (req, res) => {
   const authorId = sanitizeText(req.query.authorId, 64).trim() || "";
 
   const baseThreads = db.threads.filter(t => !t.hidden);
-  const picked = (mine && authorId) ? baseThreads.filter(t => String(t.authorId||"") === authorId) : baseThreads;
+  const picked = (mine && authorId) ? baseThreads.filter(t => String(t.creatorId || t.authorId || "") === authorId) : baseThreads;
   const threads = picked.map((t) => threadSummary(t));
 const key =
+    sort === "pv_day" ? "pvDay" :
+    sort === "pv_week" ? "pvWeek" :
+    sort === "pv_month" ? "pvMonth" :
     sort === "like_day" ? "likeDay" :
     sort === "like_week" ? "likeWeek" :
     sort === "like_month" ? "likeMonth" :
@@ -192,6 +300,8 @@ app.get(`${API}/threads/:id`, (req, res) => {
   const thread = db.threads.find((t) => t.id === id);
   if (!thread || thread.hidden) return res.status(404).json({ error: "not found" });
 
+  if (viewerId) recordPV(thread, viewerId);
+
   pruneLikeEvents(thread);
   const likeDay = likeCount(thread, 24*60*60*1000);
   const likeWeek = likeCount(thread, 7*24*60*60*1000);
@@ -209,7 +319,8 @@ app.get(`${API}/threads/:id`, (req, res) => {
 
   writeDB(db);
 
-  res.json({ thread: { id: thread.id, title: thread.title, tags: thread.tags || [], createdAt: thread.createdAt, updatedAt: thread.updatedAt, likeDay, likeWeek, likeMonth, posts } });
+  const { pvDay, pvWeek, pvMonth, pvTotal } = pvCounts(thread);
+  res.json({ thread: { id: thread.id, title: thread.title, tags: thread.tags || [], createdAt: thread.createdAt, updatedAt: thread.updatedAt, likeDay, likeWeek, likeMonth, pvDay, pvWeek, pvMonth, pvTotal, posts } });
 });
 
 app.post(`${API}/threads/:id/posts`, (req, res) => {
