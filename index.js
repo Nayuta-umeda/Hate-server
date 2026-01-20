@@ -132,11 +132,13 @@ app.get(`${API}/threads`, (req, res) => {
   const sort = String(req.query.sort || "new");
   const db = readDB();
 
-  const threads = db.threads
-    .filter(t => !t.hidden)
-    .map((t) => threadSummary(t));
+  const mine = String(req.query.mine||"") === "1";
+  const authorId = sanitizeText(req.query.authorId, 64).trim() || "";
 
-  const key =
+  const baseThreads = db.threads.filter(t => !t.hidden);
+  const picked = (mine && authorId) ? baseThreads.filter(t => String(t.authorId||"") === authorId) : baseThreads;
+  const threads = picked.map((t) => threadSummary(t));
+const key =
     sort === "like_day" ? "likeDay" :
     sort === "like_week" ? "likeWeek" :
     sort === "like_month" ? "likeMonth" :
